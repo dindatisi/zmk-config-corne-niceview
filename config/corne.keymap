@@ -33,27 +33,27 @@
                 lower_layer {
 // -----------------------------------------------------------------------------------------
 // |  ESC |  !  |  @  |  #  |  $  |  %  |   |  1  |  2  |  3  |  +  |  -  |   =  |
-// | BTCLR|  ^  |  &  |  *  |  (  |  )  |   |  4  |  5  |  6  |  *  |  UP |   :  |
-// |      |  `  | END |PG_UP|PG_DN|     |   |  7  |  8  |  9  | LFT | DWN |  RGT |
-//                    |     | GUI |     |   | ALT |  0  | ALT |
+// | BTCLR|  ^  |  &  |  *  |PG_UP|     |   |  4  |  5  |  6  |  *  |  UP |   :  |
+// |      |  `  | END |HOME |PG_DN|     |   |  7  |  8  |  9  | LFT | DWN |  RGT |
+//                    |     | GUI |     |   | ALT |  0  |     |
                         bindings = <
    &kp ESC  &kp EXCL &kp AT &kp HASH &kp DLLR &kp PRCNT                         &kp N1   &kp N2   &kp N3  &kp KP_PLUS  &kp KP_MINUS &kp KP_EQUAL
-   &bt BT_CLR &kp CARET &kp AMPS  &kp KP_MULTIPLY &bt &kp KP_LPAR &kp KP_RPAR   &kp N4  &kp N5  &kp N6  &kp KP_MULTIPLY &kp UP &kp KP_DIVIDE
-   &trans  &kp GRAVE  &kp END  &kp PG_UP  &kp PG_DN  &trans                     &kp N7  &kp N8  &kp N9  &kp LEFT &kp DOWN &kp RIGHT
-                             &trans     &kp LGUI   &trans                &kp RALT  &kp N0   &kp RALT
+   &bt BT_CLR &kp CARET &kp AMPS  &kp KP_MULTIPLY &bt &kp PG_UP &kp RPAR   &kp N4  &kp N5  &kp N6  &kp KP_MULTIPLY &kp UP &kp KP_DIVIDE
+   &trans  &kp GRAVE  &kp END  &kp HOME  &kp PG_DN  &trans                     &kp N7  &kp N8  &kp N9  &kp LEFT &kp DOWN &kp RIGHT
+                             &trans     &kp LGUI   &trans                &kp RALT  &kp N0   &trans
                         >;
                 };
 
                 raise_layer {
 // -----------------------------------------------------------------------------------------
-// | BRI_DN|BRI_UP|  @  |  #  |  $  |  %  |   | PREV| PLAY|NEXT | MUTE|VOL_DN|VOL_UP |
+// | BRI_DN|BRI_UP| APP | SRCH|  $  |  %  |   | PREV| PLAY|NEXT | MUTE|VOL_DN|VOL_UP |
 // | BTCLR | BT1  | BT2 | BT3 |  {  |  }  |   |  -  |  =  |  [  |  ]  |  \   |  `    |
-// | SHFT  |      |     |     |  {  |  }  |   |  _  |  +  |  {  |  }  | "|"  |  ~    |
+// | SHFT  |      |     |     |  (  |  )  |   |  _  |  +  |  {  |  }  | "|"  |  ~    |
 //                      | GUI |     | SPC |   |  ?  |  /  |     |
                         bindings = <
-   &kp C_BRI_DN  &kp C_BRI_UP &kp AT &kp HASH &kp DLLR &kp PRCNT     &kp C_PREV &kp C_PP  &kp C_NEXT &kp C_MUTE &kp C_VOL_DN &kp C_VOL_UP
+   &kp C_BRI_DN  &kp C_BRI_UP &kp C_AC_DESKTOP_SHOW_ALL_APPLICATIONS &kp C_AC_SEARCH &kp DLLR &kp PRCNT     &kp C_PREV &kp C_PP  &kp C_NEXT &kp C_MUTE &kp C_VOL_DN &kp C_VOL_UP
    &bt BT_CLR &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2  &kp LBRC  &kp RBRC       &kp MINUS &kp EQUAL &kp LBKT  &kp RBKT &kp BSLH &kp GRAVE
-   &kp LSHFT &trans   &trans &trans   &kp LBRC   &kp RBRC              &kp UNDER &kp PLUS  &kp LBRC   &kp RBRC &kp PIPE &kp TILDE
+   &kp LSHFT &trans   &trans &trans   &kp LPAR &kp RPAR             &kp UNDER &kp PLUS  &kp LBRC   &kp RBRC &kp PIPE &kp TILDE
                              &kp LGUI &trans   &kp SPACE           &kp QMARK   &kp SLASH    &trans
                         >;
                 };
