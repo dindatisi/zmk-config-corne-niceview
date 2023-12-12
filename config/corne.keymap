@@ -37,7 +37,7 @@
 // |      |  `  | END |HOME |PG_DN|SCRNSHT|   |  7  |  8  |  9  | LFT | DWN |  RGT |
 //                    |     | GUI |       |   | ALT |  0  |     |
                         bindings = <
-   &kp ESC  &kp EXCL &kp AT &kp NUHS &kp DLLR &kp PRCNT                         &kp N1   &kp N2   &kp N3  &kp KP_PLUS  &kp KP_MINUS &kp KP_EQUAL
+   &kp ESC  &kp EXCL &kp AT &kp NON_US_HASH &kp DLLR &kp PRCNT                         &kp N1   &kp N2   &kp N3  &kp KP_PLUS  &kp KP_MINUS &kp KP_EQUAL
    &bt BT_PRV &kp CARET &kp AMPS  &kp KP_MULTIPLY &bt &kp PG_UP &bt BT_NXT   &kp N4  &kp N5  &kp N6  &kp KP_MULTIPLY &kp UP &kp KP_DIVIDE
    &trans  &kp GRAVE  &kp END  &kp HOME  &kp PG_DN  &kp LS(LC(LG(N4)))     &kp N7  &kp N8  &kp N9  &kp LEFT &kp DOWN &kp RIGHT
                                             &trans     &kp LGUI  &trans   &kp RALT  &kp N0   &trans
