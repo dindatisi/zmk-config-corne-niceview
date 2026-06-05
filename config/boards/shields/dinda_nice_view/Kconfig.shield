@@ -1,0 +1,5 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+
+config SHIELD_DINDA_NICE_VIEW
+    def_bool $(shields_list_contains,dinda_nice_view)
