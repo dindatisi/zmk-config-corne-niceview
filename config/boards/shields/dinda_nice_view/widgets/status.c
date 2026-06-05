@@ -23,6 +23,7 @@
 #include <zmk/wpm.h>
 
 #include "status.h"
+#include "status_cat.h"
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -40,19 +41,19 @@ struct wpm_status_state {
 };
 
 static void draw_bluetooth_icon(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc) {
-    lv_point_t upper[] = {{8, 9}, {14, 15}, {11, 18}, {11, 6}, {14, 9}, {8, 15}};
+    lv_point_t upper[] = {{8, 10}, {14, 16}, {11, 19}, {11, 7}, {14, 10}, {8, 16}};
     canvas_draw_line(canvas, upper, ARRAY_SIZE(upper), line_dsc);
 }
 
 static void draw_battery_icon(lv_obj_t *canvas, const struct status_state *state,
                               lv_draw_rect_dsc_t *fg_dsc, lv_draw_rect_dsc_t *bg_dsc) {
-    canvas_draw_rect(canvas, 39, 8, 16, 8, fg_dsc);
-    canvas_draw_rect(canvas, 40, 9, 14, 6, bg_dsc);
-    canvas_draw_rect(canvas, 56, 11, 2, 3, fg_dsc);
+    canvas_draw_rect(canvas, 39, 9, 16, 8, fg_dsc);
+    canvas_draw_rect(canvas, 40, 10, 14, 6, bg_dsc);
+    canvas_draw_rect(canvas, 56, 12, 2, 3, fg_dsc);
 
     uint8_t fill = MIN((state->battery + 9) / 10, 10);
     if (fill > 0) {
-        canvas_draw_rect(canvas, 42, 11, fill, 2, fg_dsc);
+        canvas_draw_rect(canvas, 42, 12, fill, 2, fg_dsc);
     }
 }
 
@@ -110,13 +111,13 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
     } else {
         snprintf(profile_text, sizeof(profile_text), "%d", state->active_profile_index + 1);
     }
-    canvas_draw_text(canvas, 18, 0, 18, &profile_label_dsc, profile_text);
+    canvas_draw_text(canvas, 18, 1, 18, &profile_label_dsc, profile_text);
 
     draw_battery_icon(canvas, state, &fill_dsc, &bg_dsc);
 
     char battery_text[5] = {};
     snprintf(battery_text, sizeof(battery_text), "%d%%", state->battery);
-    canvas_draw_text(canvas, 35, 19, 26, &right_label_dsc, battery_text);
+    canvas_draw_text(canvas, 35, 21, 26, &right_label_dsc, battery_text);
 
     draw_connection_icon(canvas, state, &line_dsc, &arc_dsc, &fill_dsc);
 
@@ -143,63 +144,28 @@ static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
     rotate_canvas(canvas);
 }
 
-static void draw_cat_face(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc,
-                          lv_draw_arc_dsc_t *arc_dsc,
-                          lv_draw_rect_dsc_t *fill_dsc) {
-    lv_point_t left_ear[] = {{20, 16}, {24, 7}, {29, 16}};
-    lv_point_t right_ear[] = {{39, 16}, {45, 7}, {49, 17}};
-    canvas_draw_line(canvas, left_ear, ARRAY_SIZE(left_ear), line_dsc);
-    canvas_draw_line(canvas, right_ear, ARRAY_SIZE(right_ear), line_dsc);
-
-    canvas_draw_arc(canvas, 34, 24, 17, 182, 358, arc_dsc);
-    canvas_draw_arc(canvas, 34, 24, 18, 0, 180, arc_dsc);
-
-    canvas_draw_rect(canvas, 27, 24, 2, 2, fill_dsc);
-    canvas_draw_rect(canvas, 41, 24, 2, 2, fill_dsc);
-    canvas_draw_rect(canvas, 34, 29, 2, 2, fill_dsc);
-
-    lv_point_t mouth[] = {{31, 33}, {34, 35}, {37, 33}};
-    canvas_draw_line(canvas, mouth, ARRAY_SIZE(mouth), line_dsc);
+static bool cat_sprite_pixel(uint8_t frame, uint8_t x, uint8_t y) {
+    return (cat_sprites[frame][y][x / 8] & (0x80 >> (x % 8))) != 0;
 }
 
-static void draw_cat_paws(lv_obj_t *canvas, const struct status_state *state,
-                          lv_draw_line_dsc_t *line_dsc, lv_draw_arc_dsc_t *arc_dsc,
-                          lv_draw_rect_dsc_t *fill_dsc) {
-    int8_t left_lift = 0;
-    int8_t right_lift = 0;
+static void draw_cat_sprite(lv_obj_t *canvas, const struct status_state *state,
+                            lv_draw_rect_dsc_t *fill_dsc) {
+    uint8_t frame = MIN(state->cat_frame, CAT_SPRITE_FRAMES - 1);
 
-    switch (state->cat_frame) {
-    case 1:
-        left_lift = -5;
-        break;
-    case 2:
-        right_lift = -5;
-        break;
-    case 3:
-        left_lift = -4;
-        right_lift = -7;
-        break;
-    default:
-        break;
-    }
+    for (uint8_t y = 0; y < CAT_SPRITE_HEIGHT; y++) {
+        uint8_t x = 0;
+        while (x < CAT_SPRITE_WIDTH) {
+            if (!cat_sprite_pixel(frame, x, y)) {
+                x++;
+                continue;
+            }
 
-    lv_point_t left_paw[] = {{17, 43 + left_lift}, {13, 47 + left_lift}, {16, 52 + left_lift},
-                             {25, 50 + left_lift}};
-    lv_point_t right_paw[] = {{43, 42 + right_lift}, {53, 45 + right_lift},
-                              {51, 51 + right_lift}, {43, 50 + right_lift}};
-    canvas_draw_line(canvas, left_paw, ARRAY_SIZE(left_paw), line_dsc);
-    canvas_draw_line(canvas, right_paw, ARRAY_SIZE(right_paw), line_dsc);
-
-    canvas_draw_arc(canvas, 22, 58, 11, 180, 360, arc_dsc);
-    canvas_draw_arc(canvas, 46, 58, 11, 180, 360, arc_dsc);
-    lv_point_t pad_line_left[] = {{13, 58}, {33, 58}};
-    lv_point_t pad_line_right[] = {{35, 58}, {57, 58}};
-    canvas_draw_line(canvas, pad_line_left, ARRAY_SIZE(pad_line_left), line_dsc);
-    canvas_draw_line(canvas, pad_line_right, ARRAY_SIZE(pad_line_right), line_dsc);
-
-    if (state->cat_frame == 3) {
-        canvas_draw_rect(canvas, 10, 38, 3, 1, fill_dsc);
-        canvas_draw_rect(canvas, 55, 38, 3, 1, fill_dsc);
+            uint8_t start_x = x;
+            while (x < CAT_SPRITE_WIDTH && cat_sprite_pixel(frame, x, y)) {
+                x++;
+            }
+            canvas_draw_rect(canvas, start_x, y + 6, x - start_x, 1, fill_dsc);
+        }
     }
 }
 
@@ -208,15 +174,10 @@ static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
 
     lv_draw_rect_dsc_t fill_dsc;
     init_rect_dsc(&fill_dsc, LVGL_FOREGROUND);
-    lv_draw_line_dsc_t line_dsc;
-    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
-    lv_draw_arc_dsc_t arc_dsc;
-    init_arc_dsc(&arc_dsc, LVGL_FOREGROUND, 1);
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    draw_cat_face(canvas, &line_dsc, &arc_dsc, &fill_dsc);
-    draw_cat_paws(canvas, state, &line_dsc, &arc_dsc, &fill_dsc);
+    draw_cat_sprite(canvas, state, &fill_dsc);
 
     rotate_canvas(canvas);
 }
