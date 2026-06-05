@@ -40,6 +40,9 @@ struct wpm_status_state {
     uint8_t wpm;
 };
 
+#define CAT_MIDDLE_Y_OFFSET 32
+#define CAT_BOTTOM_Y_OFFSET (CAT_MIDDLE_Y_OFFSET - CANVAS_SIZE)
+
 static void draw_bluetooth_icon(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc) {
     lv_point_t upper[] = {{8, 10}, {14, 16}, {11, 19}, {11, 7}, {14, 10}, {8, 16}};
     canvas_draw_line(canvas, upper, ARRAY_SIZE(upper), line_dsc);
@@ -124,35 +127,20 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
     rotate_canvas(canvas);
 }
 
-static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
-    ARG_UNUSED(state);
-
-    lv_obj_t *canvas = lv_obj_get_child(widget, 1);
-
-    lv_draw_label_dsc_t name_dsc;
-    init_label_dsc(&name_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
-    lv_draw_line_dsc_t line_dsc;
-    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
-
-    lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
-
-    canvas_draw_text(canvas, 0, 13, 68, &name_dsc, "Dinda");
-
-    lv_point_t rule[] = {{17, 35}, {51, 35}};
-    canvas_draw_line(canvas, rule, ARRAY_SIZE(rule), &line_dsc);
-
-    rotate_canvas(canvas);
-}
-
 static bool cat_sprite_pixel(uint8_t frame, uint8_t x, uint8_t y) {
     return (cat_sprites[frame][y][x / 8] & (0x80 >> (x % 8))) != 0;
 }
 
 static void draw_cat_sprite(lv_obj_t *canvas, const struct status_state *state,
-                            lv_draw_rect_dsc_t *fill_dsc) {
+                            lv_draw_rect_dsc_t *fill_dsc, int8_t y_offset) {
     uint8_t frame = MIN(state->cat_frame, CAT_SPRITE_FRAMES - 1);
 
     for (uint8_t y = 0; y < CAT_SPRITE_HEIGHT; y++) {
+        int16_t target_y = y + y_offset;
+        if (target_y < 0 || target_y >= CANVAS_SIZE) {
+            continue;
+        }
+
         uint8_t x = 0;
         while (x < CAT_SPRITE_WIDTH) {
             if (!cat_sprite_pixel(frame, x, y)) {
@@ -164,9 +152,31 @@ static void draw_cat_sprite(lv_obj_t *canvas, const struct status_state *state,
             while (x < CAT_SPRITE_WIDTH && cat_sprite_pixel(frame, x, y)) {
                 x++;
             }
-            canvas_draw_rect(canvas, start_x, y + 6, x - start_x, 1, fill_dsc);
+            canvas_draw_rect(canvas, start_x, target_y, x - start_x, 1, fill_dsc);
         }
     }
+}
+
+static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
+    lv_obj_t *canvas = lv_obj_get_child(widget, 1);
+
+    lv_draw_label_dsc_t name_dsc;
+    init_label_dsc(&name_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
+    lv_draw_line_dsc_t line_dsc;
+    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
+    lv_draw_rect_dsc_t fill_dsc;
+    init_rect_dsc(&fill_dsc, LVGL_FOREGROUND);
+
+    lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
+
+    canvas_draw_text(canvas, 0, 13, 68, &name_dsc, "Dinda");
+
+    lv_point_t rule[] = {{17, 35}, {51, 35}};
+    canvas_draw_line(canvas, rule, ARRAY_SIZE(rule), &line_dsc);
+
+    draw_cat_sprite(canvas, state, &fill_dsc, CAT_MIDDLE_Y_OFFSET);
+
+    rotate_canvas(canvas);
 }
 
 static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
@@ -177,7 +187,7 @@ static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    draw_cat_sprite(canvas, state, &fill_dsc);
+    draw_cat_sprite(canvas, state, &fill_dsc, CAT_BOTTOM_Y_OFFSET);
 
     rotate_canvas(canvas);
 }
@@ -267,6 +277,7 @@ static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_s
             widget->state.cat_frame = 1;
         }
     }
+    draw_middle(widget->obj, &widget->state);
     draw_bottom(widget->obj, &widget->state);
 }
 
