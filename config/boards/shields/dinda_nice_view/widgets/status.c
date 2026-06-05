@@ -71,15 +71,15 @@ static void draw_connection_icon(lv_obj_t *canvas, const struct status_state *st
                                  lv_draw_line_dsc_t *line_dsc, lv_draw_arc_dsc_t *arc_dsc,
                                  lv_draw_rect_dsc_t *fill_dsc) {
     if (is_connected(state)) {
-        canvas_draw_rect(canvas, 33, 49, 3, 3, fill_dsc);
-        canvas_draw_arc(canvas, 34, 50, 8, 220, 320, arc_dsc);
-        canvas_draw_arc(canvas, 34, 50, 13, 220, 320, arc_dsc);
-        canvas_draw_arc(canvas, 34, 50, 18, 220, 320, arc_dsc);
+        canvas_draw_rect(canvas, 33, 51, 3, 3, fill_dsc);
+        canvas_draw_arc(canvas, 34, 52, 8, 220, 320, arc_dsc);
+        canvas_draw_arc(canvas, 34, 52, 13, 220, 320, arc_dsc);
+        canvas_draw_arc(canvas, 34, 52, 18, 220, 320, arc_dsc);
         return;
     }
 
-    lv_point_t slash_a[] = {{29, 44}, {39, 54}};
-    lv_point_t slash_b[] = {{39, 44}, {29, 54}};
+    lv_point_t slash_a[] = {{29, 47}, {39, 57}};
+    lv_point_t slash_b[] = {{39, 47}, {29, 57}};
     canvas_draw_line(canvas, slash_a, ARRAY_SIZE(slash_a), line_dsc);
     canvas_draw_line(canvas, slash_b, ARRAY_SIZE(slash_b), line_dsc);
 }
@@ -89,8 +89,6 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
 
     lv_draw_label_dsc_t right_label_dsc;
     init_label_dsc(&right_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_RIGHT);
-    lv_draw_label_dsc_t center_label_dsc;
-    init_label_dsc(&center_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
     lv_draw_label_dsc_t profile_label_dsc;
     init_label_dsc(&profile_label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_16, LV_TEXT_ALIGN_LEFT);
     lv_draw_rect_dsc_t fill_dsc;
@@ -121,7 +119,6 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
     canvas_draw_text(canvas, 35, 19, 26, &right_label_dsc, battery_text);
 
     draw_connection_icon(canvas, state, &line_dsc, &arc_dsc, &fill_dsc);
-    canvas_draw_text(canvas, 0, 57, 68, &center_label_dsc, is_connected(state) ? "ONLINE" : "OFFLINE");
 
     rotate_canvas(canvas);
 }
@@ -133,37 +130,93 @@ static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
 
     lv_draw_label_dsc_t name_dsc;
     init_label_dsc(&name_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
-    lv_draw_label_dsc_t wpm_label_dsc;
-    init_label_dsc(&wpm_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
     lv_draw_line_dsc_t line_dsc;
     init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    canvas_draw_text(canvas, 0, 9, 68, &name_dsc, "Dinda");
+    canvas_draw_text(canvas, 0, 13, 68, &name_dsc, "Dinda");
 
-    lv_point_t rule[] = {{17, 28}, {51, 28}};
+    lv_point_t rule[] = {{17, 35}, {51, 35}};
     canvas_draw_line(canvas, rule, ARRAY_SIZE(rule), &line_dsc);
 
-    canvas_draw_text(canvas, 0, 48, 68, &wpm_label_dsc, "WPM");
-
     rotate_canvas(canvas);
+}
+
+static void draw_cat_face(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc,
+                          lv_draw_arc_dsc_t *arc_dsc,
+                          lv_draw_rect_dsc_t *fill_dsc) {
+    lv_point_t left_ear[] = {{20, 16}, {24, 7}, {29, 16}};
+    lv_point_t right_ear[] = {{39, 16}, {45, 7}, {49, 17}};
+    canvas_draw_line(canvas, left_ear, ARRAY_SIZE(left_ear), line_dsc);
+    canvas_draw_line(canvas, right_ear, ARRAY_SIZE(right_ear), line_dsc);
+
+    canvas_draw_arc(canvas, 34, 24, 17, 182, 358, arc_dsc);
+    canvas_draw_arc(canvas, 34, 24, 18, 0, 180, arc_dsc);
+
+    canvas_draw_rect(canvas, 27, 24, 2, 2, fill_dsc);
+    canvas_draw_rect(canvas, 41, 24, 2, 2, fill_dsc);
+    canvas_draw_rect(canvas, 34, 29, 2, 2, fill_dsc);
+
+    lv_point_t mouth[] = {{31, 33}, {34, 35}, {37, 33}};
+    canvas_draw_line(canvas, mouth, ARRAY_SIZE(mouth), line_dsc);
+}
+
+static void draw_cat_paws(lv_obj_t *canvas, const struct status_state *state,
+                          lv_draw_line_dsc_t *line_dsc, lv_draw_arc_dsc_t *arc_dsc,
+                          lv_draw_rect_dsc_t *fill_dsc) {
+    int8_t left_lift = 0;
+    int8_t right_lift = 0;
+
+    switch (state->cat_frame) {
+    case 1:
+        left_lift = -5;
+        break;
+    case 2:
+        right_lift = -5;
+        break;
+    case 3:
+        left_lift = -4;
+        right_lift = -7;
+        break;
+    default:
+        break;
+    }
+
+    lv_point_t left_paw[] = {{17, 43 + left_lift}, {13, 47 + left_lift}, {16, 52 + left_lift},
+                             {25, 50 + left_lift}};
+    lv_point_t right_paw[] = {{43, 42 + right_lift}, {53, 45 + right_lift},
+                              {51, 51 + right_lift}, {43, 50 + right_lift}};
+    canvas_draw_line(canvas, left_paw, ARRAY_SIZE(left_paw), line_dsc);
+    canvas_draw_line(canvas, right_paw, ARRAY_SIZE(right_paw), line_dsc);
+
+    canvas_draw_arc(canvas, 22, 58, 11, 180, 360, arc_dsc);
+    canvas_draw_arc(canvas, 46, 58, 11, 180, 360, arc_dsc);
+    lv_point_t pad_line_left[] = {{13, 58}, {33, 58}};
+    lv_point_t pad_line_right[] = {{35, 58}, {57, 58}};
+    canvas_draw_line(canvas, pad_line_left, ARRAY_SIZE(pad_line_left), line_dsc);
+    canvas_draw_line(canvas, pad_line_right, ARRAY_SIZE(pad_line_right), line_dsc);
+
+    if (state->cat_frame == 3) {
+        canvas_draw_rect(canvas, 10, 38, 3, 1, fill_dsc);
+        canvas_draw_rect(canvas, 55, 38, 3, 1, fill_dsc);
+    }
 }
 
 static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
     lv_obj_t *canvas = lv_obj_get_child(widget, 2);
 
-    lv_draw_label_dsc_t wpm_dsc;
-    init_label_dsc(&wpm_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
     lv_draw_rect_dsc_t fill_dsc;
     init_rect_dsc(&fill_dsc, LVGL_FOREGROUND);
+    lv_draw_line_dsc_t line_dsc;
+    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
+    lv_draw_arc_dsc_t arc_dsc;
+    init_arc_dsc(&arc_dsc, LVGL_FOREGROUND, 1);
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    char wpm_text[4] = {};
-    snprintf(wpm_text, sizeof(wpm_text), "%d", state->wpm);
-    canvas_draw_text(canvas, 0, 2, 68, &wpm_dsc, wpm_text);
-    canvas_draw_rect(canvas, 31, 34, 6, 1, &fill_dsc);
+    draw_cat_face(canvas, &line_dsc, &arc_dsc, &fill_dsc);
+    draw_cat_paws(canvas, state, &line_dsc, &arc_dsc, &fill_dsc);
 
     rotate_canvas(canvas);
 }
@@ -243,6 +296,16 @@ ZMK_SUBSCRIPTION(widget_output_status, zmk_ble_active_profile_changed);
 
 static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_state state) {
     widget->state.wpm = state.wpm;
+    if (state.wpm == 0) {
+        widget->state.cat_frame = 0;
+    } else if (state.wpm < 25) {
+        widget->state.cat_frame = (widget->state.cat_frame == 1) ? 2 : 1;
+    } else {
+        widget->state.cat_frame++;
+        if (widget->state.cat_frame < 1 || widget->state.cat_frame > 3) {
+            widget->state.cat_frame = 1;
+        }
+    }
     draw_bottom(widget->obj, &widget->state);
 }
 
