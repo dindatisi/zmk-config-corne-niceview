@@ -42,6 +42,12 @@ struct wpm_status_state {
 
 #define CAT_MIDDLE_Y_OFFSET 32
 #define CAT_BOTTOM_Y_OFFSET (CAT_MIDDLE_Y_OFFSET - CANVAS_SIZE)
+#define CAT_ANIMATION_SLOW_DELAY_MS 650
+#define CAT_ANIMATION_FAST_DELAY_MS 220
+#define CAT_ANIMATION_WPM_CAP 80
+
+static struct k_work_delayable cat_animation_work;
+static bool cat_animation_work_initialized;
 
 static void draw_bluetooth_icon(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc) {
     lv_point_t upper[] = {{8, 10}, {14, 16}, {11, 19}, {11, 7}, {14, 10}, {8, 16}};
@@ -192,6 +198,44 @@ static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
     rotate_canvas(canvas);
 }
 
+static uint32_t cat_animation_delay_ms(uint8_t wpm) {
+    uint8_t capped_wpm = MIN(wpm, CAT_ANIMATION_WPM_CAP);
+    uint32_t delay_range = CAT_ANIMATION_SLOW_DELAY_MS - CAT_ANIMATION_FAST_DELAY_MS;
+
+    return CAT_ANIMATION_SLOW_DELAY_MS -
+           ((delay_range * capped_wpm) / CAT_ANIMATION_WPM_CAP);
+}
+
+static void schedule_cat_animation(uint8_t wpm) {
+    if (wpm > 0) {
+        k_work_schedule(&cat_animation_work, K_MSEC(cat_animation_delay_ms(wpm)));
+    }
+}
+
+static void cat_animation_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    bool has_active_widget = false;
+    uint32_t next_delay_ms = CAT_ANIMATION_SLOW_DELAY_MS;
+
+    struct zmk_widget_status *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        if (widget->state.wpm == 0) {
+            continue;
+        }
+
+        has_active_widget = true;
+        widget->state.cat_frame = (widget->state.cat_frame + 1) % CAT_SPRITE_FRAMES;
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+        next_delay_ms = MIN(next_delay_ms, cat_animation_delay_ms(widget->state.wpm));
+    }
+
+    if (has_active_widget) {
+        k_work_schedule(&cat_animation_work, K_MSEC(next_delay_ms));
+    }
+}
+
 static void redraw_all(struct zmk_widget_status *widget) {
     draw_top(widget->obj, &widget->state);
     draw_middle(widget->obj, &widget->state);
@@ -266,19 +310,24 @@ ZMK_SUBSCRIPTION(widget_output_status, zmk_ble_active_profile_changed);
 #endif
 
 static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_state state) {
+    bool was_typing = widget->state.wpm > 0;
+
     widget->state.wpm = state.wpm;
     if (state.wpm == 0) {
         widget->state.cat_frame = 0;
-    } else if (state.wpm < 25) {
-        widget->state.cat_frame = (widget->state.cat_frame == 1) ? 2 : 1;
-    } else {
-        widget->state.cat_frame++;
-        if (widget->state.cat_frame < 1 || widget->state.cat_frame > 3) {
-            widget->state.cat_frame = 1;
-        }
+        k_work_cancel_delayable(&cat_animation_work);
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+        return;
     }
-    draw_middle(widget->obj, &widget->state);
-    draw_bottom(widget->obj, &widget->state);
+
+    if (!was_typing) {
+        widget->state.cat_frame = 0;
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+    }
+
+    schedule_cat_animation(state.wpm);
 }
 
 static void wpm_status_update_cb(struct wpm_status_state state) {
@@ -295,6 +344,11 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_status, struct wpm_status_state, wpm_stat
 ZMK_SUBSCRIPTION(widget_wpm_status, zmk_wpm_state_changed);
 
 int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
+    if (!cat_animation_work_initialized) {
+        k_work_init_delayable(&cat_animation_work, cat_animation_work_handler);
+        cat_animation_work_initialized = true;
+    }
+
     widget->obj = lv_obj_create(parent);
     lv_obj_set_size(widget->obj, 160, 68);
 
