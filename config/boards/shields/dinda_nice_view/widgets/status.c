@@ -23,6 +23,7 @@
 #include <zmk/wpm.h>
 
 #include "status.h"
+#include "status_cat.h"
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -39,20 +40,29 @@ struct wpm_status_state {
     uint8_t wpm;
 };
 
+#define CAT_MIDDLE_Y_OFFSET 32
+#define CAT_BOTTOM_Y_OFFSET (CAT_MIDDLE_Y_OFFSET - CANVAS_SIZE)
+#define CAT_ANIMATION_SLOW_DELAY_MS 650
+#define CAT_ANIMATION_FAST_DELAY_MS 220
+#define CAT_ANIMATION_WPM_CAP 80
+
+static struct k_work_delayable cat_animation_work;
+static bool cat_animation_work_initialized;
+
 static void draw_bluetooth_icon(lv_obj_t *canvas, lv_draw_line_dsc_t *line_dsc) {
-    lv_point_t upper[] = {{8, 9}, {14, 15}, {11, 18}, {11, 6}, {14, 9}, {8, 15}};
+    lv_point_t upper[] = {{8, 10}, {14, 16}, {11, 19}, {11, 7}, {14, 10}, {8, 16}};
     canvas_draw_line(canvas, upper, ARRAY_SIZE(upper), line_dsc);
 }
 
 static void draw_battery_icon(lv_obj_t *canvas, const struct status_state *state,
                               lv_draw_rect_dsc_t *fg_dsc, lv_draw_rect_dsc_t *bg_dsc) {
-    canvas_draw_rect(canvas, 39, 8, 16, 8, fg_dsc);
-    canvas_draw_rect(canvas, 40, 9, 14, 6, bg_dsc);
-    canvas_draw_rect(canvas, 56, 11, 2, 3, fg_dsc);
+    canvas_draw_rect(canvas, 39, 9, 16, 8, fg_dsc);
+    canvas_draw_rect(canvas, 40, 10, 14, 6, bg_dsc);
+    canvas_draw_rect(canvas, 56, 12, 2, 3, fg_dsc);
 
     uint8_t fill = MIN((state->battery + 9) / 10, 10);
     if (fill > 0) {
-        canvas_draw_rect(canvas, 42, 11, fill, 2, fg_dsc);
+        canvas_draw_rect(canvas, 42, 12, fill, 2, fg_dsc);
     }
 }
 
@@ -71,15 +81,15 @@ static void draw_connection_icon(lv_obj_t *canvas, const struct status_state *st
                                  lv_draw_line_dsc_t *line_dsc, lv_draw_arc_dsc_t *arc_dsc,
                                  lv_draw_rect_dsc_t *fill_dsc) {
     if (is_connected(state)) {
-        canvas_draw_rect(canvas, 33, 49, 3, 3, fill_dsc);
-        canvas_draw_arc(canvas, 34, 50, 8, 220, 320, arc_dsc);
-        canvas_draw_arc(canvas, 34, 50, 13, 220, 320, arc_dsc);
-        canvas_draw_arc(canvas, 34, 50, 18, 220, 320, arc_dsc);
+        canvas_draw_rect(canvas, 33, 51, 3, 3, fill_dsc);
+        canvas_draw_arc(canvas, 34, 52, 8, 220, 320, arc_dsc);
+        canvas_draw_arc(canvas, 34, 52, 13, 220, 320, arc_dsc);
+        canvas_draw_arc(canvas, 34, 52, 18, 220, 320, arc_dsc);
         return;
     }
 
-    lv_point_t slash_a[] = {{29, 44}, {39, 54}};
-    lv_point_t slash_b[] = {{39, 44}, {29, 54}};
+    lv_point_t slash_a[] = {{29, 47}, {39, 57}};
+    lv_point_t slash_b[] = {{39, 47}, {29, 57}};
     canvas_draw_line(canvas, slash_a, ARRAY_SIZE(slash_a), line_dsc);
     canvas_draw_line(canvas, slash_b, ARRAY_SIZE(slash_b), line_dsc);
 }
@@ -89,8 +99,6 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
 
     lv_draw_label_dsc_t right_label_dsc;
     init_label_dsc(&right_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_RIGHT);
-    lv_draw_label_dsc_t center_label_dsc;
-    init_label_dsc(&center_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
     lv_draw_label_dsc_t profile_label_dsc;
     init_label_dsc(&profile_label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_16, LV_TEXT_ALIGN_LEFT);
     lv_draw_rect_dsc_t fill_dsc;
@@ -112,40 +120,67 @@ static void draw_top(lv_obj_t *widget, const struct status_state *state) {
     } else {
         snprintf(profile_text, sizeof(profile_text), "%d", state->active_profile_index + 1);
     }
-    canvas_draw_text(canvas, 18, 0, 18, &profile_label_dsc, profile_text);
+    canvas_draw_text(canvas, 18, 1, 18, &profile_label_dsc, profile_text);
 
     draw_battery_icon(canvas, state, &fill_dsc, &bg_dsc);
 
     char battery_text[5] = {};
     snprintf(battery_text, sizeof(battery_text), "%d%%", state->battery);
-    canvas_draw_text(canvas, 35, 19, 26, &right_label_dsc, battery_text);
+    canvas_draw_text(canvas, 35, 21, 26, &right_label_dsc, battery_text);
 
     draw_connection_icon(canvas, state, &line_dsc, &arc_dsc, &fill_dsc);
-    canvas_draw_text(canvas, 0, 57, 68, &center_label_dsc, is_connected(state) ? "ONLINE" : "OFFLINE");
 
     rotate_canvas(canvas);
 }
 
-static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
-    ARG_UNUSED(state);
+static bool cat_sprite_pixel(uint8_t frame, uint8_t x, uint8_t y) {
+    return (cat_sprites[frame][y][x / 8] & (0x80 >> (x % 8))) != 0;
+}
 
+static void draw_cat_sprite(lv_obj_t *canvas, const struct status_state *state,
+                            lv_draw_rect_dsc_t *fill_dsc, int8_t y_offset) {
+    uint8_t frame = MIN(state->cat_frame, CAT_SPRITE_FRAMES - 1);
+
+    for (uint8_t y = 0; y < CAT_SPRITE_HEIGHT; y++) {
+        int16_t target_y = y + y_offset;
+        if (target_y < 0 || target_y >= CANVAS_SIZE) {
+            continue;
+        }
+
+        uint8_t x = 0;
+        while (x < CAT_SPRITE_WIDTH) {
+            if (!cat_sprite_pixel(frame, x, y)) {
+                x++;
+                continue;
+            }
+
+            uint8_t start_x = x;
+            while (x < CAT_SPRITE_WIDTH && cat_sprite_pixel(frame, x, y)) {
+                x++;
+            }
+            canvas_draw_rect(canvas, start_x, target_y, x - start_x, 1, fill_dsc);
+        }
+    }
+}
+
+static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
     lv_obj_t *canvas = lv_obj_get_child(widget, 1);
 
     lv_draw_label_dsc_t name_dsc;
     init_label_dsc(&name_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
-    lv_draw_label_dsc_t wpm_label_dsc;
-    init_label_dsc(&wpm_label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
     lv_draw_line_dsc_t line_dsc;
     init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
+    lv_draw_rect_dsc_t fill_dsc;
+    init_rect_dsc(&fill_dsc, LVGL_FOREGROUND);
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    canvas_draw_text(canvas, 0, 9, 68, &name_dsc, "Dinda");
+    canvas_draw_text(canvas, 0, 13, 68, &name_dsc, "Dinda");
 
-    lv_point_t rule[] = {{17, 28}, {51, 28}};
+    lv_point_t rule[] = {{17, 35}, {51, 35}};
     canvas_draw_line(canvas, rule, ARRAY_SIZE(rule), &line_dsc);
 
-    canvas_draw_text(canvas, 0, 48, 68, &wpm_label_dsc, "WPM");
+    draw_cat_sprite(canvas, state, &fill_dsc, CAT_MIDDLE_Y_OFFSET);
 
     rotate_canvas(canvas);
 }
@@ -153,19 +188,52 @@ static void draw_middle(lv_obj_t *widget, const struct status_state *state) {
 static void draw_bottom(lv_obj_t *widget, const struct status_state *state) {
     lv_obj_t *canvas = lv_obj_get_child(widget, 2);
 
-    lv_draw_label_dsc_t wpm_dsc;
-    init_label_dsc(&wpm_dsc, LVGL_FOREGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
     lv_draw_rect_dsc_t fill_dsc;
     init_rect_dsc(&fill_dsc, LVGL_FOREGROUND);
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
 
-    char wpm_text[4] = {};
-    snprintf(wpm_text, sizeof(wpm_text), "%d", state->wpm);
-    canvas_draw_text(canvas, 0, 2, 68, &wpm_dsc, wpm_text);
-    canvas_draw_rect(canvas, 31, 34, 6, 1, &fill_dsc);
+    draw_cat_sprite(canvas, state, &fill_dsc, CAT_BOTTOM_Y_OFFSET);
 
     rotate_canvas(canvas);
+}
+
+static uint32_t cat_animation_delay_ms(uint8_t wpm) {
+    uint8_t capped_wpm = MIN(wpm, CAT_ANIMATION_WPM_CAP);
+    uint32_t delay_range = CAT_ANIMATION_SLOW_DELAY_MS - CAT_ANIMATION_FAST_DELAY_MS;
+
+    return CAT_ANIMATION_SLOW_DELAY_MS -
+           ((delay_range * capped_wpm) / CAT_ANIMATION_WPM_CAP);
+}
+
+static void schedule_cat_animation(uint8_t wpm) {
+    if (wpm > 0) {
+        k_work_schedule(&cat_animation_work, K_MSEC(cat_animation_delay_ms(wpm)));
+    }
+}
+
+static void cat_animation_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    bool has_active_widget = false;
+    uint32_t next_delay_ms = CAT_ANIMATION_SLOW_DELAY_MS;
+
+    struct zmk_widget_status *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        if (widget->state.wpm == 0) {
+            continue;
+        }
+
+        has_active_widget = true;
+        widget->state.cat_frame = (widget->state.cat_frame + 1) % CAT_SPRITE_FRAMES;
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+        next_delay_ms = MIN(next_delay_ms, cat_animation_delay_ms(widget->state.wpm));
+    }
+
+    if (has_active_widget) {
+        k_work_schedule(&cat_animation_work, K_MSEC(next_delay_ms));
+    }
 }
 
 static void redraw_all(struct zmk_widget_status *widget) {
@@ -242,8 +310,24 @@ ZMK_SUBSCRIPTION(widget_output_status, zmk_ble_active_profile_changed);
 #endif
 
 static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_state state) {
+    bool was_typing = widget->state.wpm > 0;
+
     widget->state.wpm = state.wpm;
-    draw_bottom(widget->obj, &widget->state);
+    if (state.wpm == 0) {
+        widget->state.cat_frame = 0;
+        k_work_cancel_delayable(&cat_animation_work);
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+        return;
+    }
+
+    if (!was_typing) {
+        widget->state.cat_frame = 0;
+        draw_middle(widget->obj, &widget->state);
+        draw_bottom(widget->obj, &widget->state);
+    }
+
+    schedule_cat_animation(state.wpm);
 }
 
 static void wpm_status_update_cb(struct wpm_status_state state) {
@@ -260,6 +344,11 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_status, struct wpm_status_state, wpm_stat
 ZMK_SUBSCRIPTION(widget_wpm_status, zmk_wpm_state_changed);
 
 int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
+    if (!cat_animation_work_initialized) {
+        k_work_init_delayable(&cat_animation_work, cat_animation_work_handler);
+        cat_animation_work_initialized = true;
+    }
+
     widget->obj = lv_obj_create(parent);
     lv_obj_set_size(widget->obj, 160, 68);
 
